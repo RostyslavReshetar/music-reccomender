@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Song Search</title>
+    <style>
+        /* Add your CSS styles here */
+    </style>
+</head>
+<body>
+    <h1>Spotify Song Search</h1>
+    <form action="/search" method="GET">
+        <input type="text" name="q" placeholder="Enter song name">
+        <button type="submit">Search</button>
+    </form>
+    <br>
+    <h2>Top Ukrainian Songs by Genre:</h2>
+    <form action="/top-ukrainian-songs" method="GET">
+        <label for="genre">Choose a genre:</label>
+        <select name="genre" id="genre">
+            <option value="pop">Pop</option>
+            <option value="rock">Rock</option>
+            <option value="hip-hop">Hip Hop</option>
+            <option value="metal">Metal</option>
+            <option value="nu metal">Nu metal</option>
+            <option value="funk">Funk</option>
+            <!-- Add more genre options as needed -->
+        </select>
+        <button type="submit">Search</button>
+    </form>
+    <form action="/ukrainian-genres" method="GET">
+      <button type="submit">Explore Ukrainian Genres</button>
+  </form>
+</body>
+</html>
