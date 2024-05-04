@@ -1,5 +1,6 @@
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, redirect, url_for
 import requests
+import urllib.parse
 
 app = Flask(__name__)
 
@@ -10,47 +11,87 @@ CLIENT_SECRET = 'ef8fb745abda4f179276e26a780bb557'
 def index():
     return render_template('index.html')
 
-def get_songs_for_artist(artist_id, access_token):
-    try:
-        headers = {'Authorization': f'Bearer {access_token}'}
-        tracks_response = requests.get(f'https://api.spotify.com/v1/artists/{artist_id}/top-tracks?country=US', headers=headers)
-        if tracks_response.status_code == 200:
-            tracks_data = tracks_response.json().get('tracks', [])[:3]  # Limit to 3 songs
-            #print(f"Tracks for Artist ID {artist_id}: {tracks_data}")  # Debug print
-            return tracks_data
-        else:
-            print(f"Failed to retrieve tracks for artist {artist_id}: {tracks_response.status_code}")
-            return []
-    except Exception as e:
-        print(f"Exception while getting songs for artist {artist_id}: {str(e)}")
-        return []
-
-
 @app.route('/search')
 def search():
     try:
         query = request.args.get('q')
-        tracks, unique_artists = None, {}
+        region = 'US'
+        tracks, unique_artists = [], {}
+        num_artists = 10
+        num_tracks = 50
+        forbidden_chars = "ЁёЪъЫыЭэ"  # No spaces in the set
+
         if query:
             access_token = get_access_token()
             if access_token:
                 headers = {'Authorization': f'Bearer {access_token}'}
-                search_params = {'q': query, 'type': 'track,artist', 'limit': 10}
-                response = requests.get('https://api.spotify.com/v1/search', headers=headers, params=search_params)
-                if response.status_code == 200:
-                    json_response = response.json()
-                    tracks = json_response.get('tracks', {}).get('items', [])
-                    artist_items = json_response.get('artists', {}).get('items', [])
+                # Fetch Tracks
+                track_params = {'q': query, 'type': 'track', 'limit': num_tracks, 'market': region}
+                track_response = requests.get('https://api.spotify.com/v1/search', headers=headers, params=track_params)
+                if track_response.status_code == 200:
+                    track_json = track_response.json()
+                    track_items = track_json.get('tracks', {}).get('items', [])
+                    for track in track_items:
+                        if track['preview_url'] and not any(ch in forbidden_chars for ch in track['name']) and len(tracks) < 10:
+                            tracks.append(track)
+
+                # Fetch Artists
+                artist_params = {'q': query, 'type': 'artist', 'limit': num_artists}
+                artist_response = requests.get('https://api.spotify.com/v1/search', headers=headers, params=artist_params)
+                if artist_response.status_code == 200:
+                    artist_json = artist_response.json()
+                    artist_items = artist_json.get('artists', {}).get('items', [])
                     for artist in artist_items:
-                        if artist['id'] not in unique_artists:
-                            artist_songs = get_songs_for_artist(artist['id'], access_token)
+                        if artist['id'] not in unique_artists and not any(ch in forbidden_chars for ch in artist['name']):
                             unique_artists[artist['id']] = artist
-                            unique_artists[artist['id']]['songs'] = artist_songs
-                            unique_artists[artist['id']]['image_url'] = artist['images'][0]['url'] if artist['images'] else "patron.jpg"
+                            unique_artists[artist['id']]['image_url'] = artist['images'][0]['url'] if artist['images'] else "default.jpg"
+
         return render_template('results.html', search_query=query, tracks=tracks, artists=list(unique_artists.values()))
     except Exception as e:
-        print(e)  # For debug, use logging in production
-        return render_template('error.html')  # A generic error page
+        print(repr(e))
+        return render_template('error.html', error_message=str(e))
+
+
+
+
+
+@app.route('/similar/<song_id>/<song_name>')
+def similar_songs(song_id, song_name):
+    access_token = get_access_token()
+    if not access_token:
+        return redirect(url_for('index'))
+
+    headers = {'Authorization': f'Bearer {access_token}'}
+    params = {
+        'seed_tracks': song_id,
+        'limit': 50,
+        'market': 'US'
+    }
+    forbidden_chars = "ЁёЪъЫыЭэ"  # No spaces in the set
+    try:
+        response = requests.get(f'https://api.spotify.com/v1/recommendations', headers=headers, params=params)
+        if response.status_code == 200:
+            data = response.json()
+            tracks = [track for track in data.get('tracks', []) if track['preview_url'] and not any(ch in forbidden_chars for ch in track['name'])]
+            filtered_tracks = tracks[:10]
+
+            if not filtered_tracks:
+                return render_template('no_data.html', song_name=urllib.parse.unquote(song_name))
+            song_name_decoded = urllib.parse.unquote(song_name)
+            return render_template('similar.html', tracks=filtered_tracks, song_name=song_name_decoded)
+        else:
+            print(f"Spotify API Error: HTTP {response.status_code} - {response.text}")
+            return render_template('error.html', error_message="Failed to fetch similar tracks.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return render_template('error.html', error_message=str(e))
+
+
+
+
+
+
+
 
 
 def get_access_token():
@@ -64,10 +105,8 @@ def get_access_token():
         print("Failed to retrieve access token:", response.status_code, response.text)
         return None
 
-
 if __name__ == '__main__':
     app.run(debug=True)
-
 
 
 
