@@ -18,7 +18,7 @@ def search():
         region = 'US'
         tracks, unique_artists = [], {}
         num_artists = 10
-        num_tracks = 50
+        num_tracks = 15
         forbidden_chars = "ЁёЪъЫыЭэ"  # No spaces in the set
 
         if query:
@@ -64,7 +64,7 @@ def similar_songs(song_id, song_name):
     headers = {'Authorization': f'Bearer {access_token}'}
     params = {
         'seed_tracks': song_id,
-        'limit': 50,
+        'limit': 15,
         'market': 'US'
     }
     forbidden_chars = "ЁёЪъЫыЭэ"  # No spaces in the set
@@ -73,7 +73,7 @@ def similar_songs(song_id, song_name):
         if response.status_code == 200:
             data = response.json()
             tracks = [track for track in data.get('tracks', []) if track['preview_url'] and not any(ch in forbidden_chars for ch in track['name'])]
-            filtered_tracks = tracks[:10]
+            filtered_tracks = tracks[:9]
 
             if not filtered_tracks:
                 return render_template('no_data.html', song_name=urllib.parse.unquote(song_name))
@@ -86,6 +86,48 @@ def similar_songs(song_id, song_name):
         print(f"An error occurred: {e}")
         return render_template('error.html', error_message=str(e))
 
+
+
+
+@app.route('/similar_artist/<artist_id>/<artist_name>')
+def similar_artists(artist_id, artist_name):
+    access_token = get_access_token()
+    if not access_token:
+        return redirect(url_for('index'))
+
+    headers = {'Authorization': f'Bearer {access_token}'}
+    url_related_artists = f'https://api.spotify.com/v1/artists/{artist_id}/related-artists'
+    forbidden_chars = "ЁёЪъЫыЭэ"
+
+    try:
+        response_related = requests.get(url_related_artists, headers=headers)
+        if response_related.status_code == 200:
+            data_related = response_related.json()
+            artists = data_related.get('artists', [])
+
+            # Fetch top tracks and genres for each artist
+            for artist in artists:
+                # Get top tracks
+                url_top_tracks = f'https://api.spotify.com/v1/artists/{artist["id"]}/top-tracks?market=US'
+                response_tracks = requests.get(url_top_tracks, headers=headers)
+                tracks_data = response_tracks.json() if response_tracks.status_code == 200 else {'tracks': []}
+                artist['top_tracks'] = tracks_data.get('tracks', [])[:2]
+
+                # Fetch genres from artist details, already available in the initial fetch
+                artist['genres'] = ', '.join(artist.get('genres', []))
+
+            filtered_artists = [artist for artist in artists if not any(ch in forbidden_chars for ch in artist['name'])][:9]
+
+            if not filtered_artists:
+                return render_template('no_data.html', artist_name=urllib.parse.unquote(artist_name))
+            artist_name_decoded = urllib.parse.unquote(artist_name)
+            return render_template('similar_artists.html', artists=filtered_artists, artist_name=artist_name_decoded)
+        else:
+            print(f"Spotify API Error: HTTP {response_related.status_code} - {response_related.text}")
+            return render_template('error.html', error_message="Failed to fetch similar artists.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return render_template('error.html', error_message=str(e))
 
 
 
