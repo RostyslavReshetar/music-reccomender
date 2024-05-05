@@ -15,41 +15,56 @@ def index():
 def search():
     try:
         query = request.args.get('q')
-        region = 'US'
-        tracks, unique_artists = [], {}
-        num_artists = 10
-        num_tracks = 15
+        max_results = 10  # Maximum results for both tracks and artists
         forbidden_chars = "ЁёЪъЫыЭэ"  # No spaces in the set
 
         if query:
             access_token = get_access_token()
             if access_token:
                 headers = {'Authorization': f'Bearer {access_token}'}
+                tracks, unique_artists = {}, {}
+
                 # Fetch Tracks
-                track_params = {'q': query, 'type': 'track', 'limit': num_tracks, 'market': region}
+                track_params = {'q': query, 'type': 'track', 'limit': max_results}
                 track_response = requests.get('https://api.spotify.com/v1/search', headers=headers, params=track_params)
                 if track_response.status_code == 200:
                     track_json = track_response.json()
                     track_items = track_json.get('tracks', {}).get('items', [])
                     for track in track_items:
-                        if track['preview_url'] and not any(ch in forbidden_chars for ch in track['name']) and len(tracks) < 10:
-                            tracks.append(track)
+                        if not any(ch in forbidden_chars for ch in track['name']):
+                            tracks[track['id']] = track  # Store track by id for easy access
 
                 # Fetch Artists
-                artist_params = {'q': query, 'type': 'artist', 'limit': num_artists}
+                artist_params = {'q': query, 'type': 'artist', 'limit': max_results}
                 artist_response = requests.get('https://api.spotify.com/v1/search', headers=headers, params=artist_params)
                 if artist_response.status_code == 200:
                     artist_json = artist_response.json()
                     artist_items = artist_json.get('artists', {}).get('items', [])
                     for artist in artist_items:
                         if artist['id'] not in unique_artists and not any(ch in forbidden_chars for ch in artist['name']):
+                            # Store only up to 3 genres per artist
+                            artist['genres'] = artist.get('genres', [])[:3]
+                            artist['image_url'] = artist['images'][0]['url'] if artist['images'] else "default.jpg"
                             unique_artists[artist['id']] = artist
-                            unique_artists[artist['id']]['image_url'] = artist['images'][0]['url'] if artist['images'] else "default.jpg"
+                            if len(unique_artists) >= max_results:
+                                break  # Stop adding artists if we reach the max results
 
-        return render_template('results.html', search_query=query, tracks=tracks, artists=list(unique_artists.values()))
+                # Attach genres to tracks
+                for track_id, track in tracks.items():
+                    # Assume the first artist is representative for genre information
+                    first_artist_id = track['artists'][0]['id']
+                    track['artist_genres'] = unique_artists[first_artist_id]['genres'] if first_artist_id in unique_artists else []
+
+                        # Check if both tracks and artists are empty
+                if not tracks and not unique_artists or not query:
+                  return render_template('no_data.html', search_query=query)
+        elif not query:
+          return render_template('no_data.html', search_query=query)
+        return render_template('results.html', search_query=query, tracks=list(tracks.values()), artists=list(unique_artists.values()))
     except Exception as e:
         print(repr(e))
         return render_template('error.html', error_message=str(e))
+
 
 
 
@@ -72,8 +87,24 @@ def similar_songs(song_id, song_name):
         response = requests.get(f'https://api.spotify.com/v1/recommendations', headers=headers, params=params)
         if response.status_code == 200:
             data = response.json()
-            tracks = [track for track in data.get('tracks', []) if track['preview_url'] and not any(ch in forbidden_chars for ch in track['name'])]
-            filtered_tracks = tracks[:9]
+            tracks = data.get('tracks', [])
+            enhanced_tracks = []
+
+            for track in tracks:
+                if track['preview_url'] and not any(ch in forbidden_chars for ch in track['name']):
+                    # Fetch each artist's genres for the track
+                    if track['artists']:
+                        artist_id = track['artists'][0]['id']
+                        artist_response = requests.get(f'https://api.spotify.com/v1/artists/{artist_id}', headers=headers)
+                        if artist_response.status_code == 200:
+                            artist_data = artist_response.json()
+                            genres = artist_data.get('genres', [])[:3]  # Limit to 3 genres
+                            track['artist_genres'] = genres
+                        else:
+                            track['artist_genres'] = []
+                    enhanced_tracks.append(track)
+
+            filtered_tracks = enhanced_tracks[:9]
 
             if not filtered_tracks:
                 return render_template('no_data.html', song_name=urllib.parse.unquote(song_name))
@@ -114,7 +145,7 @@ def similar_artists(artist_id, artist_name):
                 artist['top_tracks'] = tracks_data.get('tracks', [])[:2]
 
                 # Fetch genres from artist details, already available in the initial fetch
-                artist['genres'] = ', '.join(artist.get('genres', []))
+                artist['genres'] = ', '.join(artist['genres'][:3])
 
             filtered_artists = [artist for artist in artists if not any(ch in forbidden_chars for ch in artist['name'])][:9]
 
