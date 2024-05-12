@@ -68,12 +68,6 @@ def search():
         print(repr(e))
         return render_template('error.html', error_message=str(e))
 
-
-
-
-
-
-
 @app.route('/similar/<song_id>/<song_name>')
 def similar_songs(song_id, song_name):
     access_token = get_access_token()
@@ -123,10 +117,6 @@ def similar_songs(song_id, song_name):
     except Exception as e:
         print(f"An error occurred: {e}")
         return render_template('error.html', error_message=str(e))
-
-
-
-
 
 @app.route('/similar_artist/<artist_id>/<artist_name>')
 def similar_artists(artist_id, artist_name):
@@ -193,48 +183,6 @@ if __name__ == '__main__':
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 @app.route('/top-ukrainian-songs')
 def top_ukrainian_songs():
     access_token = get_access_token()
@@ -270,22 +218,6 @@ def top_ukrainian_songs():
         return render_template('error.html', error_message=str(e))
 
 
-
-
-
-
-
-@app.route('/ukrainian-genres')
-def ukrainian_genres():
-    access_token = get_access_token()
-    ukrainian_genres = []
-    if access_token:
-        headers = {'Authorization': f'Bearer {access_token}'}
-        response = requests.get('https://api.spotify.com/v1/recommendations/available-genre-seeds', headers=headers)
-        if response.status_code == 200:
-            genres = response.json().get('genres', [])
-            ukrainian_genres = [f"ukrainian {genre}" for genre in genres if "ukrainian" in genre or genre in ['pop', 'rock', 'dance']]
-    return render_template('ukrainian_genres.html', genres=ukrainian_genres)
 
 
 

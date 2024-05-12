@@ -296,7 +296,7 @@
             <div class="col-md-6">
                 <h2 style="color: #fff;">Songs</h2>
                 <!-- (B) AUDIO PLAYERS -->
-                <div class="card-flex">
+                <div class="card-flex" test-data="songs-card">
                     {% for track in tracks %}
                     <div class="card">
                         <div class="m-2">
@@ -305,7 +305,7 @@
                         <div class="card-body">
                             <div class="info">
                                 <strong>{{ track['name'] }}</strong>
-                                <small>by {% for artist in track['artists'] %}{{ artist['name'] }}{% if not loop.last %},{% endif %}{% endfor %}</small>
+                                <small test-data="song-artist-name">by {% for artist in track['artists'] %}{{ artist['name'] }}{% if not loop.last %},{% endif %}{% endfor %}</small>
                             </div>
                             
                             <div class="genres  d-flex gap-2 align-items-center">
@@ -369,11 +369,11 @@
             <div class="col-md-6 vertical-divider">
                 <h2 style="color: #fff;">Artists</h2>
                 <!--make grid template colums 1fr 1fr 1fr -->
-                <div class="card-flex">
+                <div class="card-flex" test-data="artits-card">
                     {% for artist in artists %}
                     <div class="card">
                         <div class="m-2">
-                            <img src="{{ artist['image_url'] }}" class="card-img-top card-img-top-artist" alt="{{ artist['name'] }}">
+                            <img src="{{ artist['image_url'] }}" class="card-img-top card-img-top-artist" alt="{{ artist['name'] }}" >
                         </div>
                         <div class="card-body">
                             <div class="info">
